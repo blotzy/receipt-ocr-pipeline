@@ -1,0 +1,14 @@
+# Core OCR & PDF stack
+pytesseract>=0.3.10
+Pillow>=10.0.0
+pymupdf>=1.23.0    # import name: fitz
+reportlab>=3.6.0
+pypdf>=5.0.0
+
+# LLM for intelligent extraction
+anthropic>=0.39.0
+
+# Recommend installing system packages:
+# - tesseract-ocr
+# - ocrmypdf (for best PDF text-layer creation)
+# - ghostscript (ocrmypdf dependency on some platforms)

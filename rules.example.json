@@ -1,0 +1,32 @@
+{
+  "categories": ["Hotel", "Meals", "Transportation", "Laundry", "Supplies", "Misc"],
+  "vendor_blacklist": [
+    "JOHN SMITH",
+    "J SMITH"
+  ],
+  "vendor_hints": {
+    "safeway": "Safeway",
+    "whole foods": "Whole Foods Market",
+    "trader joe": "Trader Joe's",
+    "marriott": "Marriott Hotel",
+    "hilton": "Hilton Hotel"
+  },
+  "matchers": [
+    {
+      "name": "Hotels",
+      "vendor_extract": [
+        {"pattern": "([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\s+Inn"},
+        {"pattern": "([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)*)\\s+Hotel"}
+      ],
+      "any": [{"vendor_re": "HILTON|HYATT|MARRIOTT|HOLIDAY\\s*INN|HAMPTON|MOTEL|INN|SUITES"}],
+      "category": "Hotel"
+    },
+    {"name": "Airlines", "any": [{"text_re": "UNITED AIRLINES|AMERICAN AIRLINES|DELTA AIR LINES"}], "category": "Transportation"},
+    {"name": "Rideshare", "any": [{"text_re": "UBER|LYFT"}], "category": "Transportation"},
+    {"name": "Car Rental", "any": [{"text_re": "HERTZ|AVIS|BUDGET|ENTERPRISE|NATIONAL|ALAMO|FOX RENT A CAR"}], "category": "Transportation"},
+    {"name": "Restaurants", "any": [{"text_re": "RESTAURANT|CAFE|PIZZA|BURGER|GRILL|DINER|KITCHEN|BISTRO|BAR|TAVERN"}], "category": "Meals"},
+    {"name": "Groceries", "any": [{"text_re": "SAFEWAY|VONS|RALPHS|TRADER JOE|WHOLE FOODS|ALBERTSONS|GELSONS|COSTCO|WALMART|TARGET"}], "category": "Meals"},
+    {"name": "Laundry", "any": [{"text_re": "LAUNDROMAT|LAUNDRY|DRY CLEAN"}], "category": "Laundry"},
+    {"name": "Pharmacy", "any": [{"text_re": "CVS|WALGREENS|RITE AID"}], "category": "Supplies"}
+  ]
+}
