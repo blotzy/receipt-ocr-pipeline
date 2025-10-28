@@ -26,6 +26,9 @@ Examples:
   # Reprocess an existing subdirectory (processes both incoming + that subdir's processed files)
   receipt-ocr --subdir 2025-W44
 
+  # Undo processing for a week (moves files back to incoming, removes from duplicates DB)
+  receipt-ocr --subdir 2025-W44 --undo
+
   # Export to SQLite database (in addition to CSV)
   receipt-ocr --export-db
 
@@ -45,6 +48,8 @@ Examples:
                        help="Optional note to include on each entry (e.g., Claim #)")
     parser.add_argument("--export-db", action="store_true",
                        help="Also export receipts to SQLite database (receipts.sqlite) for this week")
+    parser.add_argument("--undo", action="store_true",
+                       help="Undo processing for the specified week: move files back to incoming and remove from duplicates DB")
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Show detailed parsing information for debugging")
 
@@ -111,6 +116,11 @@ Examples:
         llm_model=llm_model,
         use_llm=not args.no_llm
     )
+
+    # Handle undo mode
+    if args.undo:
+        processor.undo()
+        return 0
 
     # Process all receipts
     rows, packaged_pdfs = processor.process_all()

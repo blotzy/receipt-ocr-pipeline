@@ -13,7 +13,8 @@ from .parsers import parse_date, parse_amount, parse_vendor
 from .llm import extract_with_llm
 from .categorization import categorize, load_rules
 from .database import (init_llm_cache_db, init_duplicates_db, check_duplicates,
-                       register_receipts_in_duplicates_db, upsert_sqlite)
+                       register_receipts_in_duplicates_db, remove_week_from_duplicates_db,
+                       upsert_sqlite)
 from .reporting import write_csv, build_summary_pdf, merge_pdfs, add_pdf_link_annotations
 
 
@@ -320,3 +321,45 @@ class ReceiptProcessor:
             temp_summary.unlink()
 
         print(f"[OK] Processing complete for {self.subdir_id}. Reports in: {self.reports_dir}")
+
+    def undo(self):
+        """
+        Undo processing for this week by moving files back to incoming and removing from duplicates DB.
+        This is useful if you made a mistake and want to reprocess from scratch without false duplicates.
+        """
+        # ANSI color codes
+        YELLOW = '\033[93m'
+        BOLD = '\033[1m'
+        RESET = '\033[0m'
+
+        print(f"{YELLOW}{BOLD}[UNDO] Rolling back processing for {self.subdir_id}...{RESET}")
+
+        # Move files from processed/ back to incoming/
+        moved_count = 0
+        if self.processed_dir.exists():
+            for cat_dir in self.processed_dir.iterdir():
+                if cat_dir.is_dir():
+                    for file_path in cat_dir.iterdir():
+                        if file_path.suffix.lower() in IMAGE_EXTS.union(PDF_EXTS):
+                            dest = self.incoming_dir / file_path.name
+                            # Avoid overwriting if file already exists in incoming
+                            if dest.exists():
+                                print(f"[WARN] Skipping {file_path.name} (already exists in incoming)")
+                            else:
+                                shutil.move(file_path.as_posix(), dest.as_posix())
+                                moved_count += 1
+                                print(f"[INFO] Moved {file_path.name} back to incoming/")
+
+        # Remove week from duplicates database
+        removed_count = remove_week_from_duplicates_db(self.duplicates_db, self.subdir_id)
+
+        # Delete the batch directory
+        if self.batch_dir.exists():
+            shutil.rmtree(self.batch_dir)
+            print(f"[INFO] Removed batch directory: {self.batch_dir}")
+
+        print(f"{YELLOW}{BOLD}[OK] Undo complete:{RESET}")
+        print(f"     - Moved {moved_count} file(s) back to incoming/")
+        print(f"     - Removed {removed_count} receipt(s) from duplicates database")
+        print(f"     - Deleted batch directory")
+        print(f"     You can now reprocess this batch from scratch.")

@@ -111,6 +111,9 @@ receipt-ocr --incoming ./my_receipts --output ./my_output
 
 # Specify a custom week/batch identifier
 receipt-ocr --subdir 2025-W44
+
+# Undo/rollback a week's processing (moves files back to incoming, removes from duplicates DB)
+receipt-ocr --subdir 2025-W44 --undo
 ```
 
 ### Advanced Options
@@ -124,6 +127,21 @@ receipt-ocr -v
 
 # Custom rules file
 receipt-ocr --rules ./custom_rules.json
+```
+
+### Undo Processing
+
+If you made a mistake while processing a week and want to start over without getting false duplicate warnings:
+
+```bash
+# Undo processing for a specific week
+receipt-ocr --subdir 2025-W43 --undo
+
+# This will:
+# - Move all receipts from output/2025-W43/processed/ back to incoming/
+# - Remove all 2025-W43 entries from the duplicates database
+# - Delete the output/2025-W43/ directory
+# - Allow you to reprocess from scratch without duplicate warnings
 ```
 
 ### LLM Provider Options

@@ -192,6 +192,33 @@ def register_receipts_in_duplicates_db(db_path: Path, rows: List[Dict], week_id:
     conn.close()
 
 
+def remove_week_from_duplicates_db(db_path: Path, week_id: str) -> int:
+    """
+    Remove all receipts for a specific week from the duplicates database.
+
+    Args:
+        db_path: Path to duplicates database
+        week_id: Week identifier to remove (e.g., "2025-W43")
+
+    Returns:
+        Number of receipts removed
+    """
+    conn = sqlite3.connect(db_path.as_posix())
+    cur = conn.cursor()
+
+    # Count how many will be removed
+    cur.execute("SELECT COUNT(*) FROM receipt_fingerprints WHERE week_id = ?", (week_id,))
+    count = cur.fetchone()[0]
+
+    # Remove them
+    cur.execute("DELETE FROM receipt_fingerprints WHERE week_id = ?", (week_id,))
+
+    conn.commit()
+    conn.close()
+
+    return count
+
+
 def upsert_sqlite(rows: List[Dict], sqlite_path: Path):
     """Save receipts to SQLite database."""
     conn = sqlite3.connect(sqlite_path.as_posix())
