@@ -25,7 +25,6 @@ class ReceiptProcessor:
                  vendor_blacklist: Optional[List[str]] = None,
                  notes: str = "",
                  export_db: bool = False,
-                 skip_duplicate_check: bool = False,
                  verbose: bool = False,
                  llm_provider: str = "openai",
                  llm_model: Optional[str] = None,
@@ -41,7 +40,6 @@ class ReceiptProcessor:
             vendor_blacklist: List of strings to exclude from vendor extraction
             notes: Optional notes to add to each entry
             export_db: Whether to export to SQLite
-            skip_duplicate_check: Whether to skip duplicate detection
             verbose: Whether to show verbose debugging output
             llm_provider: LLM provider to use ("openai", "anthropic", "azure-openai") - default: openai
             llm_model: LLM model name (uses provider default if not specified)
@@ -54,7 +52,6 @@ class ReceiptProcessor:
         self.vendor_blacklist = vendor_blacklist or []
         self.notes = notes
         self.export_db = export_db
-        self.skip_duplicate_check = skip_duplicate_check
         self.verbose = verbose
         self.llm_provider = llm_provider
         self.llm_model = llm_model
@@ -80,8 +77,7 @@ class ReceiptProcessor:
         self.duplicates_db = output_dir / "duplicates.db"
         self.llm_cache_db = output_dir / "llm_cache.db"
         init_llm_cache_db(self.llm_cache_db)
-        if not skip_duplicate_check:
-            init_duplicates_db(self.duplicates_db)
+        init_duplicates_db(self.duplicates_db)
 
     def discover_files(self) -> List[Path]:
         """Discover receipt files from incoming and processed directories."""
@@ -253,19 +249,23 @@ class ReceiptProcessor:
 
     def check_duplicates(self, rows: List[Dict]):
         """Check for duplicates and print warnings."""
-        if self.skip_duplicate_check:
-            print(f"[INFO] Duplicate checking skipped")
-            return
+        # ANSI color codes
+        YELLOW = '\033[93m'
+        RED = '\033[91m'
+        BOLD = '\033[1m'
+        RESET = '\033[0m'
 
-        print(f"[INFO] Checking for duplicates across all weeks...")
+        print(f"[INFO] Checking for duplicates...")
         duplicates = check_duplicates(self.duplicates_db, rows, self.subdir_id)
         if duplicates:
-            print(f"[WARN] Found {len(duplicates)} potential duplicate(s) from previous weeks:")
+            print(f"{YELLOW}{BOLD}[WARN] Found {len(duplicates)} potential duplicate(s):{RESET}")
             for dup in duplicates:
                 curr = dup["current"]
-                print(f"  - {curr.get('source_file')}: {curr.get('date')} | "
-                      f"{curr.get('vendor')} | {money_fmt(curr.get('amount'))}")
-                print(f"    Previously in week {dup['original_week']}: {dup['original_file']}")
+                orig_week = dup['original_week']
+                week_label = "same week" if orig_week == self.subdir_id else f"week {orig_week}"
+                print(f"{RED}  ⚠ {curr.get('source_file')}: {curr.get('date')} | "
+                      f"{curr.get('vendor')} | {money_fmt(curr.get('amount'))}{RESET}")
+                print(f"    Previously seen in {week_label}: {dup['original_file']}")
         else:
             print(f"[OK] No duplicates found")
 

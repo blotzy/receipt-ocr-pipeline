@@ -116,12 +116,6 @@ receipt-ocr --subdir 2025-W44
 ### Advanced Options
 
 ```bash
-# Ignore specific vendor text (e.g., your name on receipts)
-receipt-ocr --ignore-vendor "JOHN DOE" --ignore-vendor "JANE SMITH"
-
-# Skip duplicate detection (faster processing)
-receipt-ocr --skip-duplicate-check
-
 # Export to SQLite database
 receipt-ocr --export-db
 

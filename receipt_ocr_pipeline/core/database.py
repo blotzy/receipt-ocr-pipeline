@@ -82,13 +82,15 @@ def init_duplicates_db(db_path: Path):
     cur.execute("""
     CREATE TABLE IF NOT EXISTS receipt_fingerprints (
         id INTEGER PRIMARY KEY,
-        fingerprint TEXT UNIQUE,
+        fingerprint TEXT,
         week_id TEXT,
         date TEXT,
         vendor TEXT,
         amount REAL,
         source_file TEXT,
-        first_seen_timestamp TEXT
+        file_hash TEXT,
+        first_seen_timestamp TEXT,
+        UNIQUE(fingerprint, file_hash)
     )
     """)
     conn.commit()
@@ -97,7 +99,9 @@ def init_duplicates_db(db_path: Path):
 
 def check_duplicates(db_path: Path, rows: List[Dict], current_week: str) -> List[Dict]:
     """
-    Check for duplicates across all weeks based on date, vendor, and amount.
+    Check for duplicates based on date, vendor, and amount.
+    Detects duplicates both within the same week and across different weeks.
+    Uses file_hash to allow idempotent reprocessing of the same file.
 
     Args:
         db_path: Path to duplicates database
@@ -111,30 +115,53 @@ def check_duplicates(db_path: Path, rows: List[Dict], current_week: str) -> List
     cur = conn.cursor()
 
     duplicates = []
+    seen_in_current_batch = {}  # Track fingerprints in current processing batch
+
     for row in rows:
         fingerprint = compute_receipt_fingerprint(
             row.get("date"),
             row.get("vendor"),
             row.get("amount")
         )
+        current_file_hash = row.get("sha1")
 
-        # Check if this fingerprint exists in a different week
+        # Check within current batch first (for duplicates in same processing run)
+        if fingerprint in seen_in_current_batch:
+            prev_file_hash, prev_file = seen_in_current_batch[fingerprint]
+            # Only warn if different files (different hash)
+            if prev_file_hash != current_file_hash:
+                duplicates.append({
+                    "current": row,
+                    "original_week": current_week,
+                    "original_date": row.get("date"),
+                    "original_vendor": row.get("vendor"),
+                    "original_amount": row.get("amount"),
+                    "original_file": prev_file
+                })
+
+        # Check against previously registered receipts in database
         cur.execute("""
-        SELECT week_id, date, vendor, amount, source_file
+        SELECT week_id, date, vendor, amount, source_file, file_hash
         FROM receipt_fingerprints
-        WHERE fingerprint = ? AND week_id != ?
-        """, (fingerprint, current_week))
+        WHERE fingerprint = ?
+        """, (fingerprint,))
 
         result = cur.fetchone()
         if result:
-            duplicates.append({
-                "current": row,
-                "original_week": result[0],
-                "original_date": result[1],
-                "original_vendor": result[2],
-                "original_amount": result[3],
-                "original_file": result[4]
-            })
+            db_file_hash = result[5]
+            # Only warn if it's a different file (different hash)
+            if db_file_hash != current_file_hash:
+                duplicates.append({
+                    "current": row,
+                    "original_week": result[0],
+                    "original_date": result[1],
+                    "original_vendor": result[2],
+                    "original_amount": result[3],
+                    "original_file": result[4]
+                })
+
+        # Track this fingerprint in current batch
+        seen_in_current_batch[fingerprint] = (current_file_hash, row.get("source_file"))
 
     conn.close()
     return duplicates
@@ -156,10 +183,10 @@ def register_receipts_in_duplicates_db(db_path: Path, rows: List[Dict], week_id:
 
         cur.execute("""
         INSERT OR REPLACE INTO receipt_fingerprints
-        (fingerprint, week_id, date, vendor, amount, source_file, first_seen_timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        (fingerprint, week_id, date, vendor, amount, source_file, file_hash, first_seen_timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (fingerprint, week_id, row.get("date"), row.get("vendor"),
-              row.get("amount"), row.get("source_file"), timestamp))
+              row.get("amount"), row.get("source_file"), row.get("sha1"), timestamp))
 
     conn.commit()
     conn.close()

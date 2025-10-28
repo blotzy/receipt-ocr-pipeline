@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "receipt-ocr-pipeline"
-version = "1.0.0"
+version = "0.1.0"
 description = "Local, scriptable pipeline to process receipt scans into structured data and submission-ready PDFs"
 readme = "README.md"
 authors = [

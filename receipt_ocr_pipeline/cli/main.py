@@ -20,17 +20,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process receipts with all defaults (configure vendor_blacklist in rules.json)
+  # Process receipts with all defaults
   receipt-ocr
 
   # Reprocess an existing subdirectory (processes both incoming + that subdir's processed files)
   receipt-ocr --subdir 2025-W44
-
-  # Temporarily add to vendor blacklist (in addition to rules.json)
-  receipt-ocr --ignore-vendor "EXTRA NAME"
-
-  # Skip duplicate checking (faster processing)
-  receipt-ocr --skip-duplicate-check
 
   # Export to SQLite database (in addition to CSV)
   receipt-ocr --export-db
@@ -49,12 +43,8 @@ Examples:
                        help="rules.json for category mapping (default: ./rules.json)")
     parser.add_argument("--notes", default="",
                        help="Optional note to include on each entry (e.g., Claim #)")
-    parser.add_argument("--ignore-vendor", action="append",
-                       help="Ignore this text when extracting vendor (e.g., your name). Can be used multiple times")
     parser.add_argument("--export-db", action="store_true",
                        help="Also export receipts to SQLite database (receipts.sqlite) for this week")
-    parser.add_argument("--skip-duplicate-check", action="store_true",
-                       help="Skip checking for duplicate receipts across previous weeks")
     parser.add_argument("--verbose", "-v", action="store_true",
                        help="Show detailed parsing information for debugging")
 
@@ -87,10 +77,6 @@ Examples:
     rules = load_rules(Path(args.rules))
     vendor_blacklist = rules.get("vendor_blacklist", [])
 
-    # Add command-line overrides/additions
-    if args.ignore_vendor:
-        vendor_blacklist.extend(args.ignore_vendor)
-
     # Filter out example entries
     vendor_blacklist = [v for v in vendor_blacklist if not v.upper().startswith("EXAMPLE:")]
 
@@ -120,7 +106,6 @@ Examples:
         vendor_blacklist=vendor_blacklist,
         notes=args.notes,
         export_db=args.export_db,
-        skip_duplicate_check=args.skip_duplicate_check,
         verbose=args.verbose,
         llm_provider=llm_provider,
         llm_model=llm_model,
