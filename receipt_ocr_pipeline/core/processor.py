@@ -14,7 +14,7 @@ from .llm import extract_with_llm
 from .categorization import categorize, load_rules
 from .database import (init_llm_cache_db, init_duplicates_db, check_duplicates,
                        register_receipts_in_duplicates_db, remove_week_from_duplicates_db,
-                       upsert_sqlite)
+                       upsert_sqlite, get_llm_cache_batch, save_llm_cache)
 from .reporting import write_csv, build_summary_pdf, merge_pdfs, add_pdf_link_annotations
 
 
@@ -104,12 +104,17 @@ class ReceiptProcessor:
 
         return files
 
-    def process_file(self, path: Path) -> Dict:
+    def process_file(self, path: Path, file_hash: str = None,
+                     llm_cache: Dict[str, Dict] = None,
+                     new_llm_results: Dict[str, Dict] = None) -> Dict:
         """
         Process a single receipt file.
 
         Args:
             path: Path to receipt file
+            file_hash: Pre-computed SHA1 hash (optional, will compute if not provided)
+            llm_cache: Pre-loaded LLM cache dict (optional, for batch optimization)
+            new_llm_results: Dict to store new LLM results (optional, for batch saving)
 
         Returns:
             Dictionary with parsed receipt data
@@ -118,17 +123,24 @@ class ReceiptProcessor:
 
         # OCR the file
         text, pdf_path, ext = process_receipt_file(path, self.work_pdf_dir)
-        sha1 = sha1_file(path)
+        sha1 = file_hash if file_hash else sha1_file(path)
 
         # Try LLM extraction first
-        llm_result = extract_with_llm(
-            text, self.categories,
-            use_llm=self.use_llm,
-            file_hash=sha1,
-            cache_path=self.llm_cache_db,
-            provider=self.llm_provider,
-            model=self.llm_model
-        )
+        # Check pre-loaded cache first if available
+        if llm_cache is not None and sha1 in llm_cache:
+            llm_result = llm_cache[sha1]
+        else:
+            llm_result = extract_with_llm(
+                text, self.categories,
+                use_llm=self.use_llm,
+                file_hash=sha1,
+                cache_path=None,  # Skip DB lookup, we already checked cache
+                provider=self.llm_provider,
+                model=self.llm_model
+            )
+            # Store new result for batch saving later
+            if new_llm_results is not None and not llm_result.get("cached", False):
+                new_llm_results[sha1] = llm_result
 
         vendor = llm_result.get("vendor") or ""
         llm_date = llm_result.get("date")
@@ -235,16 +247,31 @@ class ReceiptProcessor:
             print("No receipt files found in incoming or processed directories.")
             return [], []
 
+        # Pre-compute file hashes and pre-load LLM cache in batch (much faster than per-file lookups)
+        file_hashes = [sha1_file(f) for f in files]
+        llm_cache = get_llm_cache_batch(self.llm_cache_db, file_hashes) if self.use_llm else {}
+
         rows = []
         packaged_pdfs = []
+        new_llm_results = {}  # Track new LLM results to save in batch
 
-        for file_path in files:
+        for file_path, file_hash in zip(files, file_hashes):
             try:
-                row, pdf_path = self.process_file(file_path)
+                row, pdf_path = self.process_file(file_path, file_hash, llm_cache, new_llm_results)
                 rows.append(row)
                 packaged_pdfs.append(pdf_path)
             except Exception as e:
                 print(f"[ERROR] Failed {file_path.name}: {e}")
+
+        # Save new LLM results to cache in batch
+        if new_llm_results:
+            for file_hash, result in new_llm_results.items():
+                save_llm_cache(
+                    self.llm_cache_db, file_hash,
+                    result.get("vendor"), result.get("date"),
+                    result.get("category"), result.get("confidence", 0.0),
+                    result.get("reasoning", "")
+                )
 
         return rows, packaged_pdfs
 
