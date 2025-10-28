@@ -6,6 +6,7 @@ reportlab>=3.6.0
 pypdf>=5.0.0
 
 # LLM for intelligent extraction
+openai>=1.0.0
 anthropic>=0.39.0
 
 # Recommend installing system packages:
