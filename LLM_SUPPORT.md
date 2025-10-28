@@ -349,4 +349,4 @@ Support for additional providers is planned:
 - **Ollama (local)** - For offline processing
 - **Custom API endpoints** - Bring your own model
 
-To request a new provider, please [open an issue](https://github.com/yourusername/receipt-ocr-pipeline/issues).
+To request a new provider, please [open an issue](https://github.com/blotzy/receipt-ocr-pipeline/issues).
